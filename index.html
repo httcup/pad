@@ -553,7 +553,7 @@
                 showToast('笔记保存成功！');
             }
             
-            // 导出笔记
+                        // 导出笔记
             function exportNote() {
                 // 确保有内容可导出
                 if (!noteContent.innerHTML.trim()) {
@@ -602,6 +602,59 @@
                 contentEl.style.color = previewContent.style.color;
                 contentEl.innerHTML = noteContent.innerHTML;
                 exportDiv.appendChild(contentEl);
+                
+                // 添加到body
+                document.body.appendChild(exportDiv);
+                
+                // 使用html2canvas截图并下载
+                function captureAndExport() {
+                    if (window.html2canvas) {
+                        html2canvas(exportDiv, {
+                            scale: 2,
+                            useCORS: true,
+                            logging: false
+                        }).then(canvas => {
+                            const link = document.createElement('a');
+                            const title = noteTitle.value.trim() || '笔记';
+                            link.download = `${title}.png`;
+                            link.href = canvas.toDataURL('image/png');
+                            link.click();
+                            
+                            // 移除临时元素
+                            document.body.removeChild(exportDiv);
+                            
+                            // 显示导出成功提示
+                            showToast('笔记导出成功！');
+                        }).catch(error => {
+                            console.error('导出失败:', error);
+                            showToast('导出失败，请重试！');
+                            document.body.removeChild(exportDiv);
+                        });
+                    } else {
+                        // 如果html2canvas还没有加载完成，等待一段时间后重试
+                        setTimeout(captureAndExport, 500);
+                    }
+                }
+                
+                // 检查html2canvas是否已加载
+                if (!window.html2canvas) {
+                    const script = document.createElement('script');
+                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                    script.onload = captureAndExport;
+                    script.onerror = function() {
+                        console.error('无法加载html2canvas库');
+                        showToast('导出功能需要网络连接，请确保网络畅通！');
+                        document.body.removeChild(exportDiv);
+                    };
+                    document.head.appendChild(script);
+                } else {
+                    captureAndExport();
+                }
+            }
+            
+            // 加载最近笔记
+            function loadRecentNotes() {
+                recentNotes.innerHTML = '';
                 
                 // 添加到body
                 document.body.appendChild(exportDiv);
