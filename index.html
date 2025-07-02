@@ -1,818 +1,172 @@
-<html lang="zh-CN"><head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>现代化笔记</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#4F46E5',
-                        secondary: '#1E40AF',
-                        neutral: '#F3F4F6',
-                        dark: '#1F2937',
-                        light: '#FFFFFF',
-                    },
-                    fontFamily: {
-                        sans: ['PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'sans-serif'],
-                    },
-                }
-            }
-        }
-    </script>
-    <style type="text/tailwindcss">
-        @layer utilities {
-            .content-auto {
-                content-visibility: auto;
-            }
-            .note-shadow {
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            }
-            .border-gradient {
-                border-image: linear-gradient(to right, #FF7A00, #FF0069, #D300C5) 1;
-            }
-            .bg-blur {
-                backdrop-filter: blur(12px);
-            }
-            .text-gradient {
-                background-clip: text;
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-            }
-            .note-hover {
-                transition: transform 0.3s ease, box-shadow 0.3s ease;
-            }
-            .note-hover:hover {
-                transform: translateY(-5px);
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-            }
-        }
-    </style>
-</head>
-<body class="bg-gray-50 min-h-screen font-sans">
-    <div id="app" class="max-w-4xl mx-auto px-4 py-8">
-        <!-- 顶部导航栏 -->
-        <header class="flex justify-between items-center mb-8">
-            <div class="flex items-center space-x-2">
-                <div class="w-10 h-10 rounded-lg bg-gradient-to-r from-primary to-secondary flex items-center justify-center">
-                    <i class="fa fa-pencil text-white text-xl"></i>
-                </div>
-                <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold bg-gradient-to-r from-primary to-secondary text-gradient">小胡的笔记</h1>
-            </div>
-            <div class="flex space-x-4">
-                <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-100 transition-colors">
-                    <i class="fa fa-moon-o text-gray-600"></i>
-                </button>
-                <button id="help-btn" class="p-2 rounded-full hover:bg-gray-100 transition-colors">
-                    <i class="fa fa-question-circle text-gray-600"></i>
-                </button>
-            </div>
-        </header>
+<!--
+    MarkDown
 
-        <!-- 笔记编辑器 -->
-        <div class="bg-white rounded-xl p-6 note-shadow mb-8">
-            <!-- 标题输入 -->
-            <div class="mb-6">
-                <input type="text" id="note-title" placeholder="输入标题..." class="w-full text-[clamp(1.25rem,2vw,1.75rem)] font-bold border-b-2 border-gray-200 focus:border-primary focus:outline-none py-2 transition-colors">
-            </div>
+    @verson 4.2.0
+-->
+<html>
+    <head>
+        <title>小胡的笔记本MarkDownPad</title>
+        <meta charset="UTF-8">
 
-            <!-- 工具栏 -->
-            <div class="flex flex-wrap gap-2 mb-6 pb-4 border-b border-gray-100">
-                <button class="toolbar-btn" data-command="bold" title="加粗">
-                    <i class="fa fa-bold"></i>
+        <link rel="manifest" href="mdp.webmanifest">
+        <script>
+            if ('serviceWorker' in navigator) {
+                console.log('CLIENT: service worker registration in progress.')
+                navigator.serviceWorker.register('./service-worker.js')
+                .then(() => {
+                    console.log('CLIENT: service worker registration complete.')
+                },
+                () => {
+                    console.error('CLIENT: service worker registration failed.')
+                })
+            }
+            else {
+                console.warn('CLIENT: service worker not supported.')
+            }
+        </script>
+        
+        <link rel="icon" href="./icon/mdp-512.png">
+
+        <!-- highlight.js -->
+        <link rel="stylesheet" href="./lib/atom-one-light.css">
+        <script src="./lib/highlight.min.js"></script>
+
+        <!-- EasyMDE -->
+        <link rel="stylesheet" href="./lib/easymde.min.css">
+        <script src="./lib/easymde.min.js"></script>
+
+        <!-- Vue -->
+        <script src="./lib/vue-2.6.11.js"></script>
+
+        <!-- Font Awesome -->
+        <link rel="stylesheet" href="./lib/fa/css/font-awesome.min.css">
+
+        <!-- proprietary includes -->
+        <link rel="stylesheet" href="md.css">
+        <script src="sidb.js"></script>
+    </head>
+    <body>
+        <div id="app">
+            <div>
+                <select class="control" v-model="selected">
+                    <option v-for="pad in pads" :value="pad">{{pad}}</option>
+                </select>
+                
+                <button 
+                    title="New"
+                    class="control" 
+                    @click="addOpenModal"
+                >
+                    <i class="fa fa-plus"></i>
                 </button>
-                <button class="toolbar-btn" data-command="italic" title="斜体">
-                    <i class="fa fa-italic"></i>
+                <button 
+                    title="Delete"
+                    class="control" 
+                    @click="toggleModal('deletemodal')" 
+                    :disabled="selected=='home'"
+                >
+                    <i class="fa fa-minus"></i>
                 </button>
-                <button class="toolbar-btn" data-command="underline" title="下划线">
-                    <i class="fa fa-underline"></i>
+                <button 
+                    title="Rename"
+                    class="control" 
+                    @click="renameOpenModal"
+                    :disabled="selected=='home'"
+                >
+                    <i class="fa fa-pencil"></i>
                 </button>
-                <button class="toolbar-btn" data-command="formatBlock" data-value="&lt;h2&gt;" title="标题">
-                    <i class="fa fa-header"></i>
+                <button 
+                    title="Download"
+                    class="control" 
+                    @click="downloadPad" 
+                >
+                    <i class="fa fa-download"></i>
                 </button>
-                <button class="toolbar-btn" data-command="justifyLeft" title="左对齐">
-                    <i class="fa fa-align-left"></i>
-                </button>
-                <button class="toolbar-btn" data-command="justifyCenter" title="居中对齐">
-                    <i class="fa fa-align-center"></i>
-                </button>
-                <button class="toolbar-btn" data-command="justifyRight" title="右对齐">
-                    <i class="fa fa-align-right"></i>
-                </button>
-                <button class="toolbar-btn" data-command="insertUnorderedList" title="无序列表">
-                    <i class="fa fa-list-ul"></i>
-                </button>
-                <button class="toolbar-btn" data-command="insertOrderedList" title="有序列表">
-                    <i class="fa fa-list-ol"></i>
-                </button>
-                <button id="color-btn" class="toolbar-btn" title="文字颜色">
-                    <i class="fa fa-paint-brush"></i>
-                </button>
-                <button id="bg-color-btn" class="toolbar-btn" title="背景颜色">
-                    <i class="fa fa-fill"></i>
-                </button>
-                <button id="upload-image-btn" class="toolbar-btn" title="上传图片">
-                    <i class="fa fa-image"></i>
-                </button>
-                <button id="link-btn" class="toolbar-btn" title="插入链接">
-                    <i class="fa fa-link"></i>
-                </button>
-                <button class="toolbar-btn" data-command="removeFormat" title="清除格式">
-                    <i class="fa fa-eraser"></i>
+                <button 
+                    title="Upload"
+                    class="control" 
+                    @click="triggerUpload" 
+                >
+                    <i class="fa fa-upload"></i>
                 </button>
             </div>
+            <div id="right">
+                <a href="https://httcup.github.io/x" target="_blank">
+                    <i class="fa fa-github"></i>
+                </a>
+                <a 
+                    href="javascript: (function(){ window.open('https://httcup.github.io/pad/', 'window', 'width=600,height=600'); })()"
+                    title="Drag this to your bookmarks bar to create a bookmarklet."
+                >
+                    <i class="fa fa-bookmark"></i>
+                </a>
+            </div>
+            <div id="mde-container">
+                <textarea id="mde-placeholder"></textarea>
+            </div>
 
-            <!-- 笔记内容 -->
-            <div id="note-content" contenteditable="true" class="min-h-[300px] text-gray-700 text-[clamp(1rem,1.5vw,1.25rem)] leading-relaxed focus:outline-none" placeholder="开始输入笔记内容..."></div>
-
-            <!-- 底部设置栏 -->
-            <div class="mt-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <!-- 底色选择 -->
-                <div class="flex items-center space-x-3">
-                    <span class="text-gray-600 font-medium">底色:</span>
-                    <div class="flex space-x-2" id="bg-color-options">
-                        <div class="w-8 h-8 rounded-full bg-white border-2 border-primary cursor-pointer" data-color="#FFFFFF"></div>
-                        <div class="w-8 h-8 rounded-full bg-yellow-50 border border-gray-200 cursor-pointer" data-color="#FFFBEB"></div>
-                        <div class="w-8 h-8 rounded-full bg-green-50 border border-gray-200 cursor-pointer" data-color="#ECFDF5"></div>
-                        <div class="w-8 h-8 rounded-full bg-blue-50 border border-gray-200 cursor-pointer" data-color="#EFF6FF"></div>
-                        <div class="w-8 h-8 rounded-full bg-purple-50 border border-gray-200 cursor-pointer" data-color="#F5F3FF"></div>
-                        <div class="w-8 h-8 rounded-full bg-pink-50 border border-gray-200 cursor-pointer" data-color="#FDF2F8"></div>
-                        <div class="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 cursor-pointer" data-color="#F3F4F6"></div>
-                        <div class="w-8 h-8 rounded-full bg-gray-800 border border-gray-700 cursor-pointer" data-color="#1F2937"></div>
-                        <div class="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 border border-gray-200 cursor-pointer" data-color="gradient"></div>
+            <div id="addmodal" class="modal">
+                <div class="modal-popup">
+                    <div class="modal-title modal-blue">
+                        New pad
                     </div>
-                </div>
-
-                <!-- 边框样式选择 -->
-                <div class="flex items-center space-x-3">
-                    <span class="text-gray-600 font-medium">边框:</span>
-                    <select id="border-style" class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                        <option value="none">无边框</option>
-                        <option value="simple" selected="">简单边框</option>
-                        <option value="rounded">圆角边框</option>
-                        <option value="shadow">阴影边框</option>
-                        <option value="gradient">渐变边框</option>
-                        <option value="dashed">虚线边框</option>
-                        <option value="glass">玻璃效果</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- 底部按钮 -->
-            <div class="mt-8 flex justify-end space-x-4">
-                <button id="save-btn" class="px-6 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors flex items-center">
-                    <i class="fa fa-save mr-2"></i> 保存笔记
-                </button>
-                <button id="export-btn" class="px-6 py-3 bg-secondary hover:bg-secondary/90 text-white rounded-lg transition-colors flex items-center">
-                    <i class="fa fa-download mr-2"></i> 导出笔记
-                </button>
-            </div>
-        </div>
-
-        <!-- 笔记预览区 -->
-        <div class="mb-8">
-            <h2 class="text-xl font-bold mb-4 text-gray-800">笔记预览</h2>
-            <div id="note-preview" class="bg-white rounded-xl p-8 note-shadow note-hover">
-                <h2 id="preview-title" class="text-2xl font-bold mb-4 text-gray-800">无标题笔记</h2>
-                <div id="preview-content" class="text-gray-700 leading-relaxed">
-                    <p>开始输入内容，预览效果将实时显示在这里...</p>
-                </div>
-                <div id="preview-footer" class="mt-6 pt-4 border-t border-gray-100 flex justify-between items-center">
-                    <div class="text-sm text-gray-500">
-                        <span id="preview-date">2023年6月15日</span>
+                    <div class="modal-content">
+                        <input id="addModalInput" v-model="newModal" type="text" @keyup.enter="addPad" @keyup.esc="toggleModal('addmodal')">
                     </div>
-                    <div class="flex space-x-2">
-                        <button class="text-gray-400 hover:text-primary transition-colors">
-                            <i class="fa fa-share-alt"></i>
-                        </button>
-                        <button class="text-gray-400 hover:text-primary transition-colors">
-                            <i class="fa fa-edit"></i>
-                        </button>
-                        <button class="text-gray-400 hover:text-red-500 transition-colors">
-                            <i class="fa fa-trash"></i>
-                        </button>
+                    <div class="modal-action">
+                        <button @click="addPad" class="modal-confirm modal-blue">Confirm</button>
+                        <button @click="toggleModal('addmodal')"  class="modal-cancel">Cancel</button>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- 最近笔记 -->
-        <div>
-            <h2 class="text-xl font-bold mb-4 text-gray-800">最近笔记</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="recent-notes">
-                <!-- 笔记卡片将动态生成 -->
+            <div id="deletemodal" class="modal">
+                <div class="modal-popup">
+                    <div class="modal-title modal-red">
+                        Delete pad
+                    </div>
+                    <div class="modal-content">
+                        Are you sure you want to DELETE this pad?<br>
+                        This is permanent and cannot be undone!<br>
+                    </div>
+                    <div class="modal-action">
+                        <button @click="removePad" id="dothething" class="modal-confirm modal-red">Confirm</button>
+                        <button @click="toggleModal('deletemodal')" class="modal-cancel">Cancel</button>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
 
-    <!-- 颜色选择器模态框 -->
-    <div id="color-picker-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-xl p-6 w-full max-w-md">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-bold text-gray-800">选择颜色</h3>
-                <button id="close-color-modal" class="text-gray-400 hover:text-gray-600">
-                    <i class="fa fa-times"></i>
-                </button>
+            <div id="renamemodal" class="modal">
+                <div class="modal-popup">
+                    <div class="modal-title modal-blue">
+                        Rename pad
+                    </div>
+                    <div class="modal-content">
+                        <input id="renameModalInput" v-model="renameModal" type="text" @keyup.enter="renamePad" @keyup.esc="toggleModal('renamemodal')">
+                    </div>
+                    <div class="modal-action">
+                        <button @click="renamePad" class="modal-confirm modal-blue">Confirm</button>
+                        <button @click="toggleModal('renamemodal')" class="modal-cancel">Cancel</button>
+                    </div>
+                </div>
             </div>
-            <div class="grid grid-cols-7 gap-2 mb-4" id="color-options">
-                <!-- 颜色选项将动态生成 -->
-            </div>
-            <div class="mt-4">
-                <input type="color" id="custom-color" class="w-full h-10 rounded-lg border-gray-200">
-            </div>
-        </div>
-    </div>
 
-    <!-- 图片上传模态框 -->
-    <div id="image-upload-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-xl p-6 w-full max-w-md">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-bold text-gray-800">上传图片</h3>
-                <button id="close-image-modal" class="text-gray-400 hover:text-gray-600">
-                    <i class="fa fa-times"></i>
-                </button>
+            <div id="alertmodal" class="modal">
+                <div class="modal-popup">
+                    <div class="modal-title modal-orange">
+                        Warning
+                    </div>
+                    <div class="modal-content">
+                        {{ alertText }}
+                    </div>
+                    <div class="modal-action">
+                        <button @click="toggleModal('alertmodal')" class="modal-confirm modal-orange">OK</button>
+                    </div>
+                </div>
             </div>
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">选择图片文件</label>
-                <input type="file" id="image-upload" accept="image/*" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/20">
-            </div>
-            <div class="flex justify-end">
-                <button id="upload-image" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
-                    上传
-                </button>
-            </div>
-        </div>
-    </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // 初始化变量
-            const noteTitle = document.getElementById('note-title');
-            const noteContent = document.getElementById('note-content');
-            const previewTitle = document.getElementById('preview-title');
-            const previewContent = document.getElementById('preview-content');
-            const previewDate = document.getElementById('preview-date');
-            const saveBtn = document.getElementById('save-btn');
-            const exportBtn = document.getElementById('export-btn');
-            const borderStyle = document.getElementById('border-style');
-            const notePreview = document.getElementById('note-preview');
-            const recentNotes = document.getElementById('recent-notes');
-            const bgColorOptions = document.getElementById('bg-color-options');
-            const themeToggle = document.getElementById('theme-toggle');
-            const helpBtn = document.getElementById('help-btn');
-            const colorBtn = document.getElementById('color-btn');
-            const bgColorBtn = document.getElementById('bg-color-btn');
-            const uploadImageBtn = document.getElementById('upload-image-btn');
-            const linkBtn = document.getElementById('link-btn');
-            const colorPickerModal = document.getElementById('color-picker-modal');
-            const imageUploadModal = document.getElementById('image-upload-modal');
-            const closeColorModal = document.getElementById('close-color-modal');
-            const closeImageModal = document.getElementById('close-image-modal');
-            const colorOptions = document.getElementById('color-options');
-            const customColor = document.getElementById('custom-color');
-            const imageUpload = document.getElementById('image-upload');
-            const uploadImage = document.getElementById('upload-image');
-            
-            let currentColorTarget = null;
-            let isDarkMode = false;
-            
-            // 初始化编辑器
-            initEditor();
-            
-            // 初始化颜色选项
-            initColorOptions();
-            
-            // 监听标题和内容变化，实时更新预览
-            noteTitle.addEventListener('input', updatePreview);
-            noteContent.addEventListener('input', updatePreview);
-            
-            // 工具栏按钮事件
-            document.querySelectorAll('.toolbar-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const command = this.getAttribute('data-command');
-                    const value = this.getAttribute('data-value');
-                    
-                    if (command === 'formatBlock') {
-                        document.execCommand(command, false, value);
-                    } else {
-                        document.execCommand(command, false, null);
-                    }
-                    
-                    noteContent.focus();
-                });
-            });
-            
-            // 颜色选择器按钮事件
-            colorBtn.addEventListener('click', function() {
-                currentColorTarget = 'textColor';
-                colorPickerModal.classList.remove('hidden');
-            });
-            
-            bgColorBtn.addEventListener('click', function() {
-                currentColorTarget = 'backgroundColor';
-                colorPickerModal.classList.remove('hidden');
-            });
-            
-            // 关闭颜色选择器
-            closeColorModal.addEventListener('click', function() {
-                colorPickerModal.classList.add('hidden');
-            });
-            
-            // 关闭图片上传模态框
-            closeImageModal.addEventListener('click', function() {
-                imageUploadModal.classList.add('hidden');
-            });
-            
-            // 图片上传按钮事件
-            uploadImageBtn.addEventListener('click', function() {
-                imageUploadModal.classList.remove('hidden');
-            });
-            
-            // 上传图片
-            uploadImage.addEventListener('click', function() {
-                const file = imageUpload.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        const img = document.createElement('img');
-                        img.src = e.target.result;
-                        img.className = 'max-w-full rounded-lg my-4';
-                        document.execCommand('insertHTML', false, img.outerHTML);
-                        imageUploadModal.classList.add('hidden');
-                        imageUpload.value = '';
-                    };
-                    reader.readAsDataURL(file);
-                }
-            });
-            
-            // 链接按钮事件
-            linkBtn.addEventListener('click', function() {
-                const url = prompt('请输入链接地址：', 'https://');
-                if (url && url.trim()) {
-                    document.execCommand('createLink', false, url.trim());
-                }
-            });
-            
-            // 底色选择事件
-            bgColorOptions.querySelectorAll('div').forEach(option => {
-                option.addEventListener('click', function() {
-                    // 移除之前的选中状态
-                    bgColorOptions.querySelectorAll('div').forEach(el => {
-                        if (el.classList.contains('border-2')) {
-                            el.classList.remove('border-2');
-                            el.classList.add('border');
-                            el.classList.add('border-gray-200');
-                        }
-                    });
-                    
-                    // 添加选中状态
-                    this.classList.remove('border');
-                    this.classList.remove('border-gray-200');
-                    this.classList.add('border-2');
-                    this.classList.add('border-primary');
-                    
-                    const color = this.getAttribute('data-color');
-                    
-                    if (color === 'gradient') {
-                        notePreview.style.backgroundImage = 'linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%)';
-                    } else {
-                        notePreview.style.backgroundImage = 'none';
-                        notePreview.style.backgroundColor = color;
-                    }
-                    
-                    // 如果是深色背景，调整文字颜色
-                    if (color === '#1F2937') {
-                        previewTitle.style.color = '#FFFFFF';
-                        previewContent.style.color = '#E5E7EB';
-                    } else {
-                        previewTitle.style.color = '#1F2937';
-                        previewContent.style.color = '#4B5563';
-                    }
-                });
-            });
-            
-            // 边框样式选择事件
-            borderStyle.addEventListener('change', function() {
-                const style = this.value;
-                
-                // 重置所有样式
-                notePreview.classList.remove('border', 'border-gray-200', 'rounded-lg', 'rounded-xl', 'rounded-2xl', 'shadow-sm', 'shadow-md', 'border-dashed', 'border-gradient', 'bg-blur');
-                notePreview.style.border = '';
-                notePreview.style.boxShadow = '';
-                notePreview.style.backdropFilter = '';
-                
-                // 应用选择的样式
-                switch (style) {
-                    case 'simple':
-                        notePreview.classList.add('border', 'border-gray-200', 'rounded-lg');
-                        break;
-                    case 'rounded':
-                        notePreview.classList.add('border', 'border-gray-200', 'rounded-2xl');
-                        break;
-                    case 'shadow':
-                        notePreview.classList.add('shadow-md', 'rounded-xl');
-                        break;
-                    case 'gradient':
-                        notePreview.classList.add('rounded-xl');
-                        notePreview.style.border = '2px solid';
-                        notePreview.style.borderImage = 'linear-gradient(to right, #FF7A00, #FF0069, #D300C5) 1';
-                        break;
-                    case 'dashed':
-                        notePreview.classList.add('border-dashed', 'border-gray-300', 'rounded-lg');
-                        break;
-                    case 'glass':
-                        notePreview.classList.add('bg-blur', 'rounded-xl');
-                        notePreview.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
-                        notePreview.style.border = '1px solid rgba(255, 255, 255, 0.3)';
-                        notePreview.style.boxShadow = '0 4px 30px rgba(0, 0, 0, 0.1)';
-                        break;
-                }
-            });
-            
-            // 保存笔记按钮事件
-            saveBtn.addEventListener('click', saveNote);
-            
-            // 导出笔记按钮事件
-            exportBtn.addEventListener('click', exportNote);
-            
-            // 主题切换事件
-            themeToggle.addEventListener('click', toggleTheme);
-            
-            // 帮助按钮事件
-            helpBtn.addEventListener('click', showHelp);
-            
-            // 初始化最近笔记
-            loadRecentNotes();
-            
-            // 初始化编辑器函数
-            function initEditor() {
-                // 设置编辑器默认样式
-                noteContent.style.fontFamily = 'PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif';
-                noteContent.style.fontSize = '16px';
-                noteContent.style.lineHeight = '1.6';
-                
-                // 设置预览默认样式
-                previewContent.style.fontFamily = 'PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif';
-                previewContent.style.fontSize = '16px';
-                previewContent.style.lineHeight = '1.6';
-                
-                // 设置日期
-                updateDate();
-            }
-            
-            // 初始化颜色选项
-            function initColorOptions() {
-                const colors = [
-                    '#000000', '#333333', '#666666', '#999999', '#CCCCCC', '#FFFFFF',
-                    '#FF0000', '#FF7A00', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF', '#FF00FF',
-                    '#8B0000', '#FF4500', '#FFD700', '#006400', '#00BFFF', '#0000CD', '#8A2BE2',
-                    '#FF69B4', '#FFA07A', '#FFFFE0', '#98FB98', '#AFEEEE', '#ADD8E6', '#DDA0DD'
-                ];
-                
-                colors.forEach(color => {
-                    const div = document.createElement('div');
-                    div.className = 'w-8 h-8 rounded-full cursor-pointer hover:scale-110 transition-transform';
-                    div.style.backgroundColor = color;
-                    div.setAttribute('data-color', color);
-                    
-                    div.addEventListener('click', function() {
-                        const selectedColor = this.getAttribute('data-color');
-                        
-                        if (currentColorTarget === 'textColor') {
-                            document.execCommand('foreColor', false, selectedColor);
-                        } else if (currentColorTarget === 'backgroundColor') {
-                            document.execCommand('hiliteColor', false, selectedColor);
-                        }
-                        
-                        colorPickerModal.classList.add('hidden');
-                        noteContent.focus();
-                    });
-                    
-                    colorOptions.appendChild(div);
-                });
-                
-                // 自定义颜色选择
-                customColor.addEventListener('input', function() {
-                    const selectedColor = this.value;
-                    
-                    if (currentColorTarget === 'textColor') {
-                        document.execCommand('foreColor', false, selectedColor);
-                    } else if (currentColorTarget === 'backgroundColor') {
-                        document.execCommand('hiliteColor', false, selectedColor);
-                    }
-                    
-                    colorPickerModal.classList.add('hidden');
-                    noteContent.focus();
-                });
-            }
-            
-            // 更新预览
-            function updatePreview() {
-                previewTitle.textContent = noteTitle.value || '无标题笔记';
-                previewContent.innerHTML = noteContent.innerHTML || '<p>开始输入内容，预览效果将实时显示在这里...</p>';
-            }
-            
-            // 更新日期
-            function updateDate() {
-                const now = new Date();
-                const year = now.getFullYear();
-                const month = now.getMonth() + 1;
-                const day = now.getDate();
-                previewDate.textContent = `${year}年${month}月${day}日`;
-            }
-            
-            // 保存笔记
-            function saveNote() {
-                const title = noteTitle.value.trim() || '无标题笔记';
-                const content = noteContent.innerHTML;
-                const date = previewDate.textContent;
-                const bgColor = notePreview.style.backgroundColor || '#FFFFFF';
-                const border = borderStyle.value;
-                
-                const note = {
-                    id: Date.now(),
-                    title: title,
-                    content: content,
-                    date: date,
-                    bgColor: bgColor,
-                    border: border
-                };
-                
-                // 保存到localStorage
-                let notes = JSON.parse(localStorage.getItem('notes')) || [];
-                notes.unshift(note); // 添加到开头
-                if (notes.length > 5) notes = notes.slice(0, 5); // 只保留最近5条
-                localStorage.setItem('notes', JSON.stringify(notes));
-                
-                // 更新最近笔记列表
-                loadRecentNotes();
-                
-                // 显示保存成功提示
-                showToast('笔记保存成功！');
-            }
-            
-                        // 导出笔记
-            function exportNote() {
-                // 确保有内容可导出
-                if (!noteContent.innerHTML.trim()) {
-                    showToast('笔记内容不能为空！');
-                    return;
-                }
-                
-                // 创建一个临时的div用于导出
-                const exportDiv = document.createElement('div');
-                exportDiv.className = 'export-note';
-                exportDiv.style.width = '800px';
-                exportDiv.style.padding = '40px';
-                exportDiv.style.margin = 'auto';
-                exportDiv.style.fontFamily = 'PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif';
-                
-                // 设置背景和边框样式
-                exportDiv.style.backgroundColor = notePreview.style.backgroundColor;
-                exportDiv.style.border = notePreview.style.border;
-                exportDiv.style.borderRadius = notePreview.style.borderRadius;
-                exportDiv.style.boxShadow = notePreview.style.boxShadow;
-                
-                // 添加标题
-                const titleEl = document.createElement('h1');
-                titleEl.className = 'export-title';
-                titleEl.style.fontSize = '28px';
-                titleEl.style.fontWeight = 'bold';
-                titleEl.style.marginBottom = '20px';
-                titleEl.style.color = previewTitle.style.color;
-                titleEl.textContent = noteTitle.value || '无标题笔记';
-                exportDiv.appendChild(titleEl);
-                
-                // 添加日期
-                const dateEl = document.createElement('div');
-                dateEl.className = 'export-date';
-                dateEl.style.fontSize = '14px';
-                dateEl.style.color = '#666';
-                dateEl.style.marginBottom = '30px';
-                dateEl.textContent = previewDate.textContent;
-                exportDiv.appendChild(dateEl);
-                
-                // 添加内容
-                const contentEl = document.createElement('div');
-                contentEl.className = 'export-content';
-                contentEl.style.fontSize = '16px';
-                contentEl.style.lineHeight = '1.8';
-                contentEl.style.color = previewContent.style.color;
-                contentEl.innerHTML = noteContent.innerHTML;
-                exportDiv.appendChild(contentEl);
-                
-                // 添加到body
-                document.body.appendChild(exportDiv);
-                
-                // 使用html2canvas截图并下载
-                function captureAndExport() {
-                    if (window.html2canvas) {
-                        html2canvas(exportDiv, {
-                            scale: 2,
-                            useCORS: true,
-                            logging: false
-                        }).then(canvas => {
-                            const link = document.createElement('a');
-                            const title = noteTitle.value.trim() || '笔记';
-                            link.download = `${title}.png`;
-                            link.href = canvas.toDataURL('image/png');
-                            link.click();
-                            
-                            // 移除临时元素
-                            document.body.removeChild(exportDiv);
-                            
-                            // 显示导出成功提示
-                            showToast('笔记导出成功！');
-                        }).catch(error => {
-                            console.error('导出失败:', error);
-                            showToast('导出失败，请重试！');
-                            document.body.removeChild(exportDiv);
-                        });
-                    } else {
-                        // 如果html2canvas还没有加载完成，等待一段时间后重试
-                        setTimeout(captureAndExport, 500);
-                    }
-                }
-                
-                // 检查html2canvas是否已加载
-                if (!window.html2canvas) {
-                    const script = document.createElement('script');
-                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-                    script.onload = captureAndExport;
-                    script.onerror = function() {
-                        console.error('无法加载html2canvas库');
-                        showToast('导出功能需要网络连接，请确保网络畅通！');
-                        document.body.removeChild(exportDiv);
-                    };
-                    document.head.appendChild(script);
-                } else {
-                    captureAndExport();
-                }
-            }
-            
-            // 加载最近笔记
-            function loadRecentNotes() {
-                recentNotes.innerHTML = '';
-                
-                // 添加到body
-                document.body.appendChild(exportDiv);
-                
-                // 使用html2canvas截图并下载
-                if (!window.html2canvas) {
-                    const script = document.createElement('script');
-                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-                    script.onload = function() {
-                        captureAndDownload(exportDiv);
-                    };
-                    document.head.appendChild(script);
-                } else {
-                    captureAndDownload(exportDiv);
-                }
-            }
-            
-            // 截图并下载
-            function captureAndDownload(element) {
-                html2canvas(element, {
-                    scale: 2,
-                    useCORS: true,
-                    logging: false
-                }).then(canvas => {
-                    const link = document.createElement('a');
-                    const title = noteTitle.value.trim() || '笔记';
-                    link.download = `${title}.png`;
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
-                    
-                    // 移除临时元素
-                    document.body.removeChild(element);
-                    
-                    // 显示导出成功提示
-                    showToast('笔记导出成功！');
-                });
-            }
-            
-            // 加载最近笔记
-            function loadRecentNotes() {
-                recentNotes.innerHTML = '';
-                
-                const notes = JSON.parse(localStorage.getItem('notes')) || [];
-                
-                if (notes.length === 0) {
-                    recentNotes.innerHTML = `
-                        <div class="col-span-full bg-white rounded-lg p-6 text-center text-gray-500">
-                            <i class="fa fa-file-o text-4xl mb-4"></i>
-                            <p>暂无保存的笔记</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                notes.forEach(note => {
-                    const card = document.createElement('div');
-                    card.className = 'bg-white rounded-lg p-4 note-shadow note-hover';
-                    
-                    // 设置背景色
-                    if (note.bgColor) {
-                        card.style.backgroundColor = note.bgColor;
-                    }
-                    
-                    // 设置边框样式
-                    if (note.border === 'rounded') {
-                        card.classList.add('rounded-xl');
-                    } else if (note.border === 'shadow') {
-                        card.classList.add('shadow-md');
-                    } else if (note.border === 'gradient') {
-                        card.style.border = '2px solid';
-                        card.style.borderImage = 'linear-gradient(to right, #FF7A00, #FF0069, #D300C5) 1';
-                    }
-                    
-                    card.innerHTML = `
-                        <h3 class="font-bold text-lg mb-2 truncate">${note.title}</h3>
-                        <div class="text-gray-600 text-sm mb-3 line-clamp-3">${stripHtml(note.content)}</div>
-                        <div class="flex justify-between items-center text-xs text-gray-400">
-                            <span>${note.date}</span>
-                            <div class="flex space-x-2">
-                                <button class="text-gray-400 hover:text-primary transition-colors" onclick="loadNote(${note.id})">
-                                    <i class="fa fa-eye"></i>
-                                </button>
-                                <button class="text-gray-400 hover:text-red-500 transition-colors" onclick="deleteNote(${note.id})">
-                                    <i class="fa fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                    
-                    recentNotes.appendChild(card);
-                });
-            }
-            
-            // 加载笔记
-            window.loadNote = function(id) {
-                const notes = JSON.parse(localStorage.getItem('notes')) || [];
-                const note = notes.find(n => n.id === id);
-                
-                if (note) {
-                    noteTitle.value = note.title;
-                    noteContent.innerHTML = note.content;
-                    previewDate.textContent = note.date;
-                    
-                    // 更新预览的背景色和边框
-                    const bgOption = bgColorOptions.querySelector(`[data-color="${note.bgColor}"]`);
-                    if (bgOption) {
-                        bgColorOptions.querySelectorAll('div').forEach(el => {
-                            if (el.classList.contains('border-2')) {
-                                el.classList.remove('border-2');
-                                el.classList.add('border');
-                                el.classList.add('border-gray-200');
-                            }
-                        });
-                        
-                        bgOption.classList.remove('border');
-                        bgOption.classList.remove('border-gray-200');
-                        bgOption.classList.add('border-2');
-                        bgOption.classList.add('border-primary');
-                        
-                        notePreview.style.backgroundColor = note.bgColor;
-                    }
-                    
-                    // 更新边框样式
-                    borderStyle.value = note.border || 'simple';
-                    borderStyle.dispatchEvent(new Event('change'));
-                    
-                    updatePreview();
-                    
-                    // 滚动到编辑器
-                    document.getElementById('app').scrollIntoView({ behavior: 'smooth' });
-                }
-            };
-            
-            // 删除笔记
-            window.deleteNote = function(id) {
-                if (confirm('确定要删除这条笔记吗？')) {
-                    let notes = JSON.parse(localStorage.getItem('notes')) || [];
-                    notes = notes.filter(n => n.id !== id);
-                    localStorage.setItem('notes', JSON.stringify(notes));
-                    loadRecentNotes();
-                    showToast('笔记已删除！');
-                }
-            };
-            
-            // 切换主题
-            function toggleTheme() {
-                isDarkMode = !isDarkMode;
-                
-                if (isDarkMode) {
-                    document.body.classList.add('bg-gray-900');
-                    document.body.classList.remove('bg-gray-50');
-                    themeToggle.innerHTML = '<i class="fa fa-sun-o text-yellow-400"></i>';
-                    
-                    // 更新预览卡片为深色主题
-                    notePreview.style.backgroundColor = '#1F2937';
-                    previewTitle.style.color = '#FFFFFF';
-                    previewContent.style.color = '#E5E7EB';
-                    
-                    // 更新最近笔记卡片
-                    document.querySelectorAll('#recent-notes > div').forEach(card => {
-                        card.style.backgroundColor = '#1F2937';</script></body></html>
+            <input id="fileUploadInput" type="file" @change="loadFile" style="display: none;" accept=".md,.txt">
+        </div> <!-- #app -->
+        <script src="md.js"></script>
+    </body>
+</html>
